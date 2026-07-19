@@ -20,7 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getBackendMetrics, runDiligence, uploadPitchDeck } from './lib/api';
+import { getBackendMetrics, getBenchmark, getMemo, getRetrievalAnalytics, getRunHistory, runDiligence, uploadPitchDeck } from './lib/api';
 import {
   Line,
   LineChart,
@@ -61,11 +61,75 @@ export default function App() {
   const [semanticResults, setSemanticResults] = useState<any[]>([]);
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'executing' | 'complete'>('idle');
   const [pipelineStep, setPipelineStep] = useState<number>(0);
-  const [backendMetrics, setBackendMetrics] = useState<{ latency_ms: number; trust_score: number; validation_score: number; hallucination_rate: number } | null>(null);
+  const [backendMetrics, setBackendMetrics] = useState<any>(null);
+  const [runHistory, setRunHistory] = useState<any[]>([]);
+  const [benchmark, setBenchmark] = useState<any>(null);
+  const [retrievalAnalytics, setRetrievalAnalytics] = useState<any>(null);
+  const [memoOverview, setMemoOverview] = useState<any>(null);
   const [uploadMessage, setUploadMessage] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRunningDiligence, setIsRunningDiligence] = useState(false);
   const [diligenceSummary, setDiligenceSummary] = useState<string>('');
+  const [selectedMemoSection, setSelectedMemoSection] = useState<string>('Investment recommendation');
+
+  const memoSections = {
+    'Investment recommendation': {
+      heading: 'Investment recommendation',
+      content: 'Executive Summary • Investment Recommendation • Founder Assessment • Technology Assessment • Market Opportunity • Competitive Landscape • Business Model • Risks & Red Flags • Mitigation Strategies • Portfolio Fit • Exit Potential • Due Diligence Questions • Evidence & Citations • Final Confidence'
+    },
+    'Executive summary': {
+      heading: 'Executive summary',
+      content: 'InfraAI is developing compiler-level optimization routing layers to eliminate LLM latency bottlenecks. The system combines strong technical depth, measurable open-source traction, and a defensible moat that makes it a credible Seed-stage investment candidate.'
+    },
+    'Founder Assessment': {
+      heading: 'Founder assessment',
+      content: 'Founders show exceptional execution signals with a proven track record in distributed systems. Strong open-source contributions signal deep technical expertise and community leadership. Founder score: 92/100 with an upward trajectory.'
+    },
+    'Technology Assessment': {
+      heading: 'Technology assessment',
+      content: 'The core technology is a proprietary compiler optimization layer that addresses systemic LLM latency bottlenecks. Architecture includes context-scaling routines, pipelined inference, and vendor-agnostic integration. Technology moat is strong and difficult to replicate.'
+    },
+    'Market Opportunity': {
+      heading: 'Market opportunity',
+      content: 'Total addressable market: $12B in AI infrastructure. Market growing at 38% CAGR. Enterprise demand for performance optimization is accelerating. Strong timing window before hyperscaler in-house solutions mature.'
+    },
+    'Competitive Landscape': {
+      heading: 'Competitive landscape',
+      content: 'Direct competitors: vLLM, TensorRT. Indirect competition from cloud providers. InfraAI\'s approach is differentiated through compiler-level optimization vs. runtime patching. Defensibility via patents and community moat.'
+    },
+    'Business Model': {
+      heading: 'Business model',
+      content: 'B2B SaaS licensing model with per-inference pricing. Target customers: AI infrastructure teams, LLM API providers, enterprise AI operations. Projected gross margins: 75%+ after scaling.'
+    },
+    'Risks & Red Flags': {
+      heading: 'Risks & red flags',
+      content: 'Market adoption risk: requires integration with existing ML stacks. Hyperscaler competition accelerating. Technology could be commoditized. Finance evidence incomplete. Traction validation needed.'
+    },
+    'Mitigation Strategies': {
+      heading: 'Mitigation strategies',
+      content: 'Accelerate enterprise pilots and case studies. Build strategic partnerships with cloud providers. Continue open-source investments for community defensibility. Expand team to reduce execution risk.'
+    },
+    'Portfolio Fit': {
+      heading: 'Portfolio fit',
+      content: 'Strong fit with existing portfolio in AI infrastructure. Minimal cannibalization risk. Adds geographic diversification. Aligns with fund thesis in developer tools and infrastructure.'
+    },
+    'Exit Potential': {
+      heading: 'Exit potential',
+      content: 'Expected exit horizon: 7-10 years. Acquisition targets: cloud providers (AWS, Azure, GCP), LLM companies (Anthropic, others), or independent IPO. Expected return multiple: 12x at $100M ARR.'
+    },
+    'Due Diligence Questions': {
+      heading: 'Due diligence questions',
+      content: '• What is the current ARR and MRR? • How many enterprise pilots are in progress? • What is the current burn rate and runway? • Have you secured any design partnerships? • What are the detailed technical benchmarks vs. vLLM?'
+    },
+    'Evidence & Citations': {
+      heading: 'Evidence & citations',
+      content: '[GitHub API] 6,432 stars • [LinkedIn] Founder education and track record verified • [Company website] Technology overview confirmed • [Pitch deck] Business model outlined • [Registry data] ARR claims reconciled • [News] Market trend validation'
+    },
+    'Final Confidence': {
+      heading: 'Final confidence',
+      content: 'Overall confidence score: 93%. Based on: Founder track record (91%), Technology differentiation (95%), Market timing (74%), Evidence quality (87%), Competitive moat (89%). Recommendation: APPROVE for $500K check at 8% target ownership.'
+    }
+  };
 
   const radarData = [
     { subject: 'Market', A: 74, fullMark: 100 },
@@ -85,8 +149,18 @@ export default function App() {
   useEffect(() => {
     const loadMetrics = async () => {
       try {
-        const metrics = await getBackendMetrics();
+        const [metrics, history, benchmarkData, retrieval, memo] = await Promise.all([
+          getBackendMetrics(),
+          getRunHistory(),
+          getBenchmark(),
+          getRetrievalAnalytics(),
+          getMemo(),
+        ]);
         setBackendMetrics(metrics);
+        setRunHistory(history?.runs || []);
+        setBenchmark(benchmarkData);
+        setRetrievalAnalytics(retrieval);
+        setMemoOverview(memo);
       } catch (error) {
         console.error('Failed to load backend metrics', error);
       }
@@ -125,8 +199,18 @@ export default function App() {
     try {
       const result = await runDiligence('infraai');
       setDiligenceSummary(result?.recommendation || 'Diligence completed successfully.');
-      const metrics = await getBackendMetrics();
+      const [metrics, history, benchmarkData, retrieval, memo] = await Promise.all([
+        getBackendMetrics(),
+        getRunHistory(),
+        getBenchmark(),
+        getRetrievalAnalytics(),
+        getMemo(),
+      ]);
       setBackendMetrics(metrics);
+      setRunHistory(history?.runs || []);
+      setBenchmark(benchmarkData);
+      setRetrievalAnalytics(retrieval);
+      setMemoOverview(memo);
     } catch (error) {
       setDiligenceSummary(error instanceof Error ? error.message : 'Diligence run failed.');
     } finally {
@@ -289,27 +373,59 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className={`${panelClass} p-6`}>
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Recent evaluations</div>
-                      <div className="text-lg font-semibold text-white">Latest startup reviews</div>
-                    </div>
-                    <button className="text-sm font-medium text-blue-300">View all</button>
-                  </div>
-                  <div className="space-y-3">
-                    {['InfraAI', 'VisionStack', 'NovaML'].map((item, index) => (
-                      <div key={item} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                        <div>
-                          <div className="font-semibold text-white">{item}</div>
-                          <div className="text-sm text-slate-400">Updated {index === 0 ? '2 hours ago' : index === 1 ? '5 hours ago' : '1 day ago'}</div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Approve</span>
-                          <ChevronRight className="h-4 w-4 text-slate-400" />
-                        </div>
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className={`${panelClass} p-6`}>
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Recent evaluations</div>
+                        <div className="text-lg font-semibold text-white">Latest startup reviews</div>
                       </div>
-                    ))}
+                      <button className="text-sm font-medium text-blue-300">View all</button>
+                    </div>
+                    <div className="space-y-3">
+                      {runHistory.length > 0 ? runHistory.slice(0, 3).map((item: any, index: number) => (
+                        <div key={item.run_id || index} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
+                          <div>
+                            <div className="font-semibold text-white">{item.company || item.opportunity_id || 'Run'}</div>
+                            <div className="text-sm text-slate-400">{item.created_at || 'Recorded'} • {item.decision || 'In progress'}</div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">{item.trust ? `${Math.round(item.trust * 100)}%` : 'Live'}</span>
+                            <ChevronRight className="h-4 w-4 text-slate-400" />
+                          </div>
+                        </div>
+                      )) : ['InfraAI', 'VisionStack', 'NovaML'].map((item, index) => (
+                        <div key={item} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
+                          <div>
+                            <div className="font-semibold text-white">{item}</div>
+                            <div className="text-sm text-slate-400">Updated {index === 0 ? '2 hours ago' : index === 1 ? '5 hours ago' : '1 day ago'}</div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Approve</span>
+                            <ChevronRight className="h-4 w-4 text-slate-400" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={`${panelClass} p-6`}>
+                    <div className="mb-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Benchmark mode</div>
+                      <div className="text-lg font-semibold text-white">Evaluation accuracy</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                      <div className="text-4xl font-semibold text-white">{benchmark?.accuracy ? `${Math.round(benchmark.accuracy * 100)}%` : '88%'}</div>
+                      <div className="mt-2 text-sm text-slate-400">Across startup cases with expected recommendations and trust targets.</div>
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm text-slate-300">
+                      {benchmark?.dataset?.slice(0, 2).map((item: any, index: number) => (
+                        <div key={item.company || index} className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2">
+                          <span>{item.company}</span>
+                          <span className="text-emerald-300">{item.expected_recommendation}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -797,8 +913,14 @@ export default function App() {
                 <div className="w-full shrink-0 rounded-[1.5rem] border border-white/10 bg-slate-900/80 p-6 lg:w-56">
                   <div className="mb-6 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Memo sections</div>
                   <nav className="space-y-3 text-sm">
-                    {['Company snapshot', 'Investment hypotheses', 'SWOT', 'Team & history', 'Problem & product', 'Technology & defensibility', 'Market sizing', 'Competition', 'Traction & KPIs', 'Financials & round structure', 'Cap table', 'Due diligence log'].map((section, index) => (
-                      <div key={section} className={`cursor-pointer rounded-lg px-3 py-2 transition ${index === 0 ? 'bg-blue-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}>{section}</div>
+                    {Object.keys(memoSections).map((section) => (
+                      <button
+                        key={section}
+                        onClick={() => setSelectedMemoSection(section)}
+                        className={`w-full text-left rounded-lg px-3 py-2 transition ${selectedMemoSection === section ? 'bg-blue-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+                      >
+                        {section}
+                      </button>
                     ))}
                   </nav>
                 </div>
@@ -808,25 +930,8 @@ export default function App() {
                   <p className="mt-3 border-b border-white/10 pb-6 text-sm text-slate-400">Generated automatically by VC Brain • {new Date().toLocaleDateString()}</p>
                   <div className="mt-8 space-y-8 text-sm leading-7 text-slate-300">
                     <section>
-                      <h2 className="mb-3 text-xl font-semibold text-white">Company snapshot</h2>
-                      <p>InfraAI is developing compiler-level optimization routing layers to eliminate LLM latency bottlenecks. Targeting a $12B addressable market, the technology resolves systemic context scalability limits.</p>
-                    </section>
-                    <section>
-                      <h2 className="mb-3 text-xl font-semibold text-white">Investment hypotheses</h2>
-                      <p>We are investing based on founder track record, top 1% open-source traction, and a deep architectural moat verified through compiler pipeline benchmarks.</p>
-                    </section>
-                    <section>
-                      <h2 className="mb-3 text-xl font-semibold text-white">SWOT</h2>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
-                          <div className="mb-2 font-semibold text-emerald-300">Strengths</div>
-                          <p>Extreme compiler architecture talent and strong GitHub contribution growth.</p>
-                        </div>
-                        <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4">
-                          <div className="mb-2 font-semibold text-rose-300">Threats</div>
-                          <p>Hyperscalers are increasingly building inline compiler optimizations natively.</p>
-                        </div>
-                      </div>
+                      <h2 className="mb-3 text-xl font-semibold text-white">{memoSections[selectedMemoSection as keyof typeof memoSections]?.heading || selectedMemoSection}</h2>
+                      <p>{memoSections[selectedMemoSection as keyof typeof memoSections]?.content || 'Content for this section is being loaded.'}</p>
                     </section>
                   </div>
                 </div>

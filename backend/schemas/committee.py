@@ -4,9 +4,14 @@ from datetime import datetime
 
 class Evidence(BaseModel):
     id: str
+    claim: str
     source: str
-    content: str
+    url: Optional[str] = None
+    confidence: float = 0.0
+    reliability: float = 0.0
+    verified: bool = False
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class Claim(BaseModel):
     claim_text: str

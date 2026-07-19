@@ -17,25 +17,27 @@ class RiskMatrix(BaseModel):
 
 class InvestmentMemo(BaseModel):
     executive_summary: SectionContent
+    investment_recommendation: SectionContent
     founder_assessment: SectionContent
-    technology: SectionContent
-    market: SectionContent
-    competition: SectionContent
-    moat: SectionContent
-    traction: SectionContent
-    financial_signals: SectionContent
-    risks: SectionContent
-    due_diligence: SectionContent
-    
-    # Quantitative & Final Outcomes
+    technology_assessment: SectionContent
+    market_opportunity: SectionContent
+    competitive_landscape: SectionContent
+    business_model: SectionContent
+    risks_and_red_flags: SectionContent
+    mitigation_strategies: SectionContent
+    portfolio_fit: SectionContent
+    exit_potential: SectionContent
+    due_diligence_questions: SectionContent
+    evidence_and_citations: SectionContent
+    final_confidence: SectionContent
+
     trust_score: float
     recommendation: str = Field(description="APPROVE, REJECT, or FURTHER_DD")
     confidence: float
     next_actions: List[str]
     supporting_evidence: List[str]
     missing_evidence: List[str]
-    
-    # New Bloomberg UI Fields (calculated by LLM)
+
     expected_upside_multiple: float = Field(default=0.0, description="AI Estimate of return multiple e.g. 7.4")
     investment_score: int = Field(default=0, description="0-100 overall investment score")
     competitor_analysis: List[CompetitorAnalysis] = Field(default_factory=list)

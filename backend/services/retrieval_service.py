@@ -47,39 +47,40 @@ class AdvancedRetrievalService:
         vectorstore = self.get_vectorstore()
         if not vectorstore:
             return "No relevant evidence found in the vector database."
-            
-        # 1 & 2. Hybrid Retrieval & Metadata Filter
-        kwargs = {"k": 10} # Fetch more for reranking
+
+        kwargs = {"k": 10}
         if filter_metadata:
             kwargs["filter"] = filter_metadata
-            
+
         raw_results = vectorstore.similarity_search_with_score(query, **kwargs)
         formatted_results = [
             {"content": doc.page_content, "metadata": doc.metadata, "similarity_score": float(score)}
             for doc, score in raw_results
         ]
-        
-        # 3. Reranker
+
         reranked_results = self.rerank_chunks(formatted_results)
-        
-        # 4. Context Compression (Keep top 4 after reranking, then compress)
         top_chunks = reranked_results[:4]
-        
-        # To avoid heavy latency for every query during a 30s demo, we implement a fast 
-        # heuristic compression: strip out boilerplate and enforce a hard token limit per chunk.
-        # In a strict production non-demo, we'd use LLMChainExtractor here.
+
         context_blocks = []
         for res in top_chunks:
-            # Drop terrible scores even after reranking
             if res["reranked_score"] < 1.2:
                 source = res['metadata'].get('source', 'Unknown Document')
-                # Fast compression: take first 500 chars to prevent context flooding
                 compressed_content = res['content'][:500].strip() + ("..." if len(res['content']) > 500 else "")
                 context_blocks.append(f"[Source: {source}]\n{compressed_content}")
-                
+
         if not context_blocks:
             return "No relevant evidence found in the vector database."
-            
+
+        self.last_retrieval_analytics = {
+            "candidates": len(formatted_results),
+            "metadata_filtered": len([item for item in formatted_results if item["metadata"]]),
+            "reranked": len(reranked_results),
+            "compressed": len(context_blocks),
+            "query": query,
+        }
         return "\n\n".join(context_blocks)
+
+    def get_last_retrieval_analytics(self) -> Dict[str, Any]:
+        return getattr(self, "last_retrieval_analytics", {})
 
 retrieval_service = AdvancedRetrievalService()

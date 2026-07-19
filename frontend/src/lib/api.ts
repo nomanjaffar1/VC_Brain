@@ -17,7 +17,23 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getBackendMetrics() {
-  return requestJson<{ latency_ms: number; trust_score: number; validation_score: number; hallucination_rate: number }>('/api/v1/evaluation/metrics');
+  return requestJson<any>('/api/v1/evaluation/metrics');
+}
+
+export async function getRunHistory() {
+  return requestJson<any>('/api/v1/run-history');
+}
+
+export async function getBenchmark() {
+  return requestJson<any>('/api/v1/benchmark');
+}
+
+export async function getRetrievalAnalytics() {
+  return requestJson<any>('/api/v1/retrieval');
+}
+
+export async function getMemo() {
+  return requestJson<any>('/api/v1/memo?opportunity_id=infraai');
 }
 
 export async function uploadPitchDeck(file: File) {
