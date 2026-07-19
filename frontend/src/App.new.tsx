@@ -20,7 +20,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getBackendMetrics, runDiligence, uploadPitchDeck } from './lib/api';
 import {
   Line,
   LineChart,
@@ -61,11 +60,6 @@ export default function App() {
   const [semanticResults, setSemanticResults] = useState<any[]>([]);
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'executing' | 'complete'>('idle');
   const [pipelineStep, setPipelineStep] = useState<number>(0);
-  const [backendMetrics, setBackendMetrics] = useState<{ latency_ms: number; trust_score: number; validation_score: number; hallucination_rate: number } | null>(null);
-  const [uploadMessage, setUploadMessage] = useState<string>('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [isRunningDiligence, setIsRunningDiligence] = useState(false);
-  const [diligenceSummary, setDiligenceSummary] = useState<string>('');
 
   const radarData = [
     { subject: 'Market', A: 74, fullMark: 100 },
@@ -81,19 +75,6 @@ export default function App() {
     { name: '2023', score: 85 },
     { name: '2024', score: 92 },
   ];
-
-  useEffect(() => {
-    const loadMetrics = async () => {
-      try {
-        const metrics = await getBackendMetrics();
-        setBackendMetrics(metrics);
-      } catch (error) {
-        console.error('Failed to load backend metrics', error);
-      }
-    };
-
-    loadMetrics();
-  }, []);
 
   useEffect(() => {
     if (analysisPhase !== 'executing') return;
@@ -115,40 +96,10 @@ export default function App() {
     };
   }, [analysisPhase]);
 
-  const startAnalysis = async () => {
+  const startAnalysis = () => {
     setActiveView('analysis');
     setAnalysisPhase('executing');
     setPipelineStep(0);
-    setIsRunningDiligence(true);
-    setDiligenceSummary('');
-
-    try {
-      const result = await runDiligence('infraai');
-      setDiligenceSummary(result?.recommendation || 'Diligence completed successfully.');
-      const metrics = await getBackendMetrics();
-      setBackendMetrics(metrics);
-    } catch (error) {
-      setDiligenceSummary(error instanceof Error ? error.message : 'Diligence run failed.');
-    } finally {
-      setIsRunningDiligence(false);
-    }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setUploadMessage('');
-
-    try {
-      const result = await uploadPitchDeck(file);
-      setUploadMessage(result?.message || `Uploaded ${file.name} successfully.`);
-    } catch (error) {
-      setUploadMessage(error instanceof Error ? error.message : 'Upload failed.');
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   const handleSemanticSearch = () => {
@@ -262,8 +213,8 @@ export default function App() {
                         <Zap className="mr-2 h-3.5 w-3.5" />
                         Venture intelligence platform
                       </div>
-                      <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">VC Brain, engineered for disciplined venture decision-making.</h1>
-                      <p className="mt-4 text-lg text-slate-300">Screen founders with greater clarity, connect diligence workflows to the backend in real time, and publish investor-ready memos with confidence.</p>
+                      <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">VC Brain, reimagined for high-signal investing.</h1>
+                      <p className="mt-4 text-lg text-slate-300">Screen founders faster, synthesize signals across memory, trust, and market intelligence, and publish polished investment memos in minutes.</p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-5 py-4 shadow-inner">
                       <div className="text-3xl font-semibold text-white">$100K</div>
@@ -277,15 +228,15 @@ export default function App() {
                     <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 text-blue-300">
                       <Sparkles className="h-7 w-7" />
                     </div>
-                    <div className="text-xl font-semibold text-white">Start a new diligence workflow</div>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">Submit a new company, connect it to the live API, and launch the full screening and memo pipeline.</p>
+                    <div className="text-xl font-semibold text-white">Start a new analysis</div>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">Ingest a new startup through inbound applications or outbound sourcing and launch the full AI pipeline.</p>
                   </button>
                   <button onClick={() => setActiveView('analysis')} className={`${panelClass} group flex flex-col items-start p-8 text-left transition hover:-translate-y-1`}>
                     <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 text-emerald-300">
                       <History className="h-7 w-7" />
                     </div>
-                    <div className="text-xl font-semibold text-white">Resume the most recent review</div>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">Pick up from InfraAI, VisionStack, or NovaML and continue from the latest backend-backed analysis.</p>
+                    <div className="text-xl font-semibold text-white">Resume the previous run</div>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">Pick up from InfraAI, VisionStack, or NovaML and continue where the workflow left off.</p>
                   </button>
                 </div>
 
@@ -428,17 +379,14 @@ export default function App() {
                       <input type="text" className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none transition focus:border-blue-400/50" defaultValue="infra.ai" />
                     </div>
                   </div>
-                  <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-12 text-center text-slate-400 transition hover:border-blue-400/30 hover:bg-blue-500/5">
+                  <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-12 text-center text-slate-400 transition hover:border-blue-400/30 hover:bg-blue-500/5">
                     <UploadCloud className="mb-4 h-8 w-8 text-slate-300" />
                     <div className="text-lg font-semibold text-slate-200">Upload pitch deck</div>
                     <div className="mt-1 text-sm">PDF, PPTX, or link-based source</div>
-                    <input type="file" className="hidden" onChange={handleFileUpload} />
-                  </label>
-                  {uploadMessage ? <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{uploadMessage}</div> : null}
-                  <div className="mt-8 flex justify-end">
-                    <button onClick={startAnalysis} className={buttonClass} disabled={isRunningDiligence}>{isRunningDiligence ? 'Running diligence...' : 'Send to AI pipeline'}</button>
                   </div>
-                  {diligenceSummary ? <div className="mt-3 rounded-xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-200">{diligenceSummary}</div> : null}
+                  <div className="mt-8 flex justify-end">
+                    <button onClick={startAnalysis} className={buttonClass}>Send to AI pipeline</button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -849,7 +797,7 @@ export default function App() {
             <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">System status</div>
             <div className={`${panelSoftClass} space-y-3 p-4 font-mono text-[11px]`}>
               {[
-                ['Backend API', backendMetrics ? 'Connected' : 'Checking', 'text-blue-300'],
+                ['GPT-4o', 'Running', 'text-blue-300'],
                 ['Memory layer', 'Healthy', 'text-emerald-300'],
                 ['Embedding', 'Running', 'text-violet-300'],
                 ['Validator', 'Running', 'text-violet-300'],
@@ -860,8 +808,8 @@ export default function App() {
                 </div>
               ))}
               <div className="my-2 h-px bg-white/10" />
-              <div className="flex items-center justify-between text-slate-300"><span>Latency</span><span>{backendMetrics ? `${backendMetrics.latency_ms} ms` : '—'}</span></div>
-              <div className="flex items-center justify-between text-slate-300"><span>Trust score</span><span>{backendMetrics ? `${backendMetrics.trust_score.toFixed(1)}%` : '—'}</span></div>
+              <div className="flex items-center justify-between text-slate-300"><span>Latency</span><span>182 ms</span></div>
+              <div className="flex items-center justify-between text-slate-300"><span>Tokens</span><span>12,482</span></div>
             </div>
           </div>
 
