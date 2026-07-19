@@ -13,6 +13,27 @@ class Claim(BaseModel):
     source_domain: str
     agent_confidence: float
 
+class MoatScores(BaseModel):
+    technology: int = 0
+    distribution: int = 0
+    data: int = 0
+    community: int = 0
+    network: int = 0
+
+class FounderScores(BaseModel):
+    execution: int = 0
+    technical: int = 0
+    leadership: int = 0
+    oss: int = 0
+    research: int = 0
+    experience: str = "Unknown"
+
+class MarketMetrics(BaseModel):
+    market_size_billions: float = 0.0
+    growth_rate: float = 0.0
+    competition_level: str = "Unknown"
+    timing: str = "Unknown"
+
 class CommitteeVote(BaseModel):
     agent_id: str
     vote: str = Field(description="Must be APPROVE, REJECT, or FURTHER_DD")
@@ -21,6 +42,9 @@ class CommitteeVote(BaseModel):
     claims: List[Claim] = []
     risks: List[str] = []
     missing_evidence: List[str] = []
+    moat_scores: Optional[MoatScores] = None
+    founder_scores: Optional[FounderScores] = None
+    market_metrics: Optional[MarketMetrics] = None
 
 class DecisionResponse(BaseModel):
     opportunity_id: str

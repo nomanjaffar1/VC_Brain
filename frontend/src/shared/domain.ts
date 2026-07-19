@@ -21,7 +21,7 @@ export type MemoryEvent = z.infer<typeof MemoryEventSchema>;
 
 export const FounderSchema = z.object({
   id: z.string().uuid(),
-  public_keys: z.record(z.string()), 
+  public_keys: z.record(z.string(), z.string()), 
   founder_score: z.number(),
   created_at: z.date(),
 });
@@ -30,7 +30,7 @@ export type Founder = z.infer<typeof FounderSchema>;
 export const CompanySchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  canonical_profile: z.record(z.any()),
+  canonical_profile: z.record(z.string(), z.any()),
 });
 export type Company = z.infer<typeof CompanySchema>;
 

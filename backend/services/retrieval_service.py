@@ -2,8 +2,7 @@ import os
 from typing import List, Dict, Any
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import LLMChainExtractor
+
 from backend.config.settings import settings
 from backend.document_processing.ingestion import FAISS_INDEX_PATH
 

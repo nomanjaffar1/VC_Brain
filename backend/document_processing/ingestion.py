@@ -67,3 +67,30 @@ class DocumentIngestionPipeline:
             return False
 
 ingestion_pipeline = DocumentIngestionPipeline()
+
+def ingest_documents():
+    """
+    Helper function to automatically ingest all files in data/pitch_decks
+    """
+    upload_dir = os.path.join(os.getcwd(), "data", "pitch_decks")
+    if not os.path.exists(upload_dir):
+        return
+        
+    for filename in os.listdir(upload_dir):
+        file_path = os.path.join(upload_dir, filename)
+        if os.path.isfile(file_path):
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                
+            metadata = {"filename": filename, "source": "Uploaded Pitch Deck"}
+            # default founder_id for demo purposes
+            founder_id = "demo_founder_99"
+            if "founder" in content.lower():
+                 founder_id = "founder_99"
+
+            ingestion_pipeline.process_document(
+                raw_text=content,
+                metadata=metadata,
+                doc_type="pitch_deck",
+                founder_id=founder_id
+            )
