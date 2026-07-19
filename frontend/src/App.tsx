@@ -20,7 +20,10 @@ import {
   Zap,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getBackendMetrics, getBenchmark, getMemo, getRetrievalAnalytics, getRunHistory, runDiligence, uploadPitchDeck } from './lib/api';
+import { getBackendMetrics, getBenchmark, getMemo, getRetrievalAnalytics, getRunHistory, runDiligence, uploadPitchDeck,
+  submitInboundApplication, startEnrichment, getEnrichmentStatus,
+  executeDiscoverySearch, createInvestmentCase, saveDiscoveryQuery, getSavedQueries
+} from './lib/api';
 import {
   Line,
   LineChart,
@@ -54,9 +57,100 @@ export default function App() {
     riskAppetite: 'Moderate',
   });
 
-  const [outboundStep, setOutboundStep] = useState<'identify' | 'activate' | 'converge'>('identify');
-  const [selectedOutboundFounder, setSelectedOutboundFounder] = useState<any>(null);
-  const [customOutreachMail, setCustomOutreachMail] = useState<string>('');
+  // Inbound Application State
+  const [inboundForm, setInboundForm] = useState({
+    companyName: 'InfraAI',
+    website: 'infra.ai',
+    oneLineDescription: 'Compiler-level LLM optimization routing',
+    sector: 'AI Infrastructure',
+    stage: 'Seed',
+    location: 'San Francisco, CA',
+    fundingAsk: 500000,
+    currentRaise: 0,
+    companyEmail: 'founders@infra.ai',
+    teamSize: 8,
+    foundedYear: 2023,
+    currentRevenue: 0,
+    mrr: 0,
+  });
+
+  const [founders, setFounders] = useState<any[]>([
+    { id: 1, name: 'Sarah Chen', linkedin: 'linkedin.com/in/sarahchen', github: 'sarahchen', twitter: '@sarahchen', website: '', isTechnical: true, previousStartup: true, openSource: true, researchPubs: false }
+  ]);
+
+  const [assets, setAssets] = useState<any[]>([
+    { id: 1, type: 'Pitch Deck', status: 'Ready', uploadedAt: new Date().toISOString() }
+  ]);
+
+  const [externalSources, setExternalSources] = useState({
+    github: 'github.com/infra-ai',
+    gitlab: '',
+    productHunt: '',
+    appStore: '',
+    googlePlay: '',
+    huggingface: '',
+    arxiv: '',
+    blog: 'blog.infra.ai',
+    crunchbase: '',
+    linkedin: '',
+    twitter: '@infraai',
+    youtube: '',
+  });
+
+  const [investmentContext, setInvestmentContext] = useState({
+    thesis: 'AI Infrastructure Modernization',
+    priority: 'High',
+    notes: 'Strong technical moat and market timing',
+    partner: 'Jane Smith',
+    fund: 'Fund III',
+    targetOwnership: 8,
+    riskAppetite: 'Moderate',
+    tags: ['AI', 'Infrastructure', 'Enterprise'],
+  });
+
+  const [enrichmentPhase, setEnrichmentPhase] = useState<'idle' | 'running' | 'complete'>('idle');
+  const [enrichmentSteps, setEnrichmentSteps] = useState<any[]>([]);
+
+  // Outbound Discovery State
+  const [outboundSources, setOutboundSources] = useState({
+    github: true,
+    gitlab: true,
+    productHunt: true,
+    hackerNews: true,
+    ycombinator: true,
+    techstars: true,
+    crunchbase: true,
+    dealroom: true,
+    arxiv: true,
+    semanticScholar: true,
+    linkedin: true,
+    twitter: true,
+    news: true,
+  });
+
+  const [outboundQuery, setOutboundQuery] = useState('technical founder building AI infrastructure');
+  const [outboundFilters, setOutboundFilters] = useState({
+    sector: '',
+    country: '',
+    stage: '',
+    githubStars: { min: 0, max: 100000 },
+    employees: { min: 0, max: 1000 },
+    researchPublished: false,
+    technicalFounder: true,
+    ossContributor: true,
+  });
+
+  const [savedQueries, setSavedQueries] = useState<any[]>([
+    { id: 1, name: 'AI Infrastructure Europe', query: 'technical founder building AI infrastructure in Europe' },
+    { id: 2, name: 'Healthcare AI', query: 'founder with healthcare background and AI expertise' },
+  ]);
+
+  const [discoveryResults, setDiscoveryResults] = useState<any[]>([
+    { id: 1, founderName: 'Sarah Chen', companyName: 'InfraAI', founderScore: 92, companyScore: 88, portfolioFit: 85, coldStartScore: 79, marketScore: 82, techScore: 95, expectedReturn: '12x', confidence: 0.93, riskLevel: 'Moderate', githubStars: 6432, paperCitations: 24, accelerator: 'Y Combinator', country: 'USA', latestSignal: 'Enterprise partnership announced', foundReason: 'GitHub stars increased 80%' }
+  ]);
+
+  const [outboundStep, setOutboundStep] = useState<'discover' | 'evaluate' | 'case'>('discover');
+  const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [semanticQuery, setSemanticQuery] = useState('technical founder, Berlin, AI infra, enterprise traction');
   const [semanticResults, setSemanticResults] = useState<any[]>([]);
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'executing' | 'complete'>('idle');
@@ -252,14 +346,72 @@ export default function App() {
     ]);
   };
 
-  const handleOutboundIdentify = (founder: any) => {
-    setSelectedOutboundFounder(founder);
-    setCustomOutreachMail(`Hi ${founder.name},\n\nI was reviewing your contributions to compiler optimizations on GitHub and wanted to reach out. At Acme Fund, we're deploying $100K checks into exceptional builders within 24 hours. Let's get you set up on the VC Brain workspace.\n\nBest,\nAcme Team`);
-    setOutboundStep('activate');
+  const handleInboundEnrichment = async () => {
+    try {
+      setEnrichmentPhase('running');
+      const inboundData = {
+        company_name: inboundForm.companyName,
+        website: inboundForm.website,
+        one_line_description: inboundForm.oneLineDescription,
+        sector: inboundForm.sector,
+        stage: inboundForm.stage,
+        location: inboundForm.location,
+        funding_ask: inboundForm.fundingAsk,
+        current_raise: inboundForm.currentRaise,
+        company_email: inboundForm.companyEmail,
+        team_size: inboundForm.teamSize,
+        founded_year: inboundForm.foundedYear,
+        current_revenue: inboundForm.currentRevenue,
+        mrr: inboundForm.mrr,
+        founders: founders,
+        external_sources: externalSources,
+        investment_context: investmentContext,
+      };
+
+      const submitResult = await submitInboundApplication(inboundData);
+      const opportunityId = submitResult.opportunity_id;
+
+      // Simulate enrichment steps
+      await startEnrichment(opportunityId);
+      
+      setEnrichmentPhase('complete');
+    } catch (error) {
+      console.error('Enrichment failed:', error);
+      setEnrichmentPhase('idle');
+    }
   };
 
-  const handleOutboundActivate = () => {
-    setOutboundStep('converge');
+  const handleOutboundSearch = async () => {
+    try {
+      const searchResult = await executeDiscoverySearch(outboundQuery, outboundSources, outboundFilters);
+      setDiscoveryResults(searchResult.candidates || []);
+    } catch (error) {
+      console.error('Search failed:', error);
+    }
+  };
+
+  const handleCreateInvestmentCase = async (candidate: any) => {
+    try {
+      const caseResult = await createInvestmentCase({
+        candidate_id: candidate.id,
+        company_name: candidate.company_name,
+        founder_name: candidate.founder_name,
+      });
+      setSelectedCandidate(candidate);
+      setOutboundStep('case');
+      startAnalysis();
+    } catch (error) {
+      console.error('Case creation failed:', error);
+    }
+  };
+
+  const handleSaveQuery = async () => {
+    try {
+      await saveDiscoveryQuery(`Query ${new Date().toLocaleDateString()}`, outboundQuery);
+      alert('Query saved successfully!');
+    } catch (error) {
+      console.error('Save query failed:', error);
+    }
   };
 
   return (
@@ -316,7 +468,7 @@ export default function App() {
                 key={key}
                 onClick={() => {
                   setActiveView(key as any);
-                  if (key === 'outbound') setOutboundStep('identify');
+                  if (key === 'outbound') setOutboundStep('discover');
                 }}
                 className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${activeView === key ? 'bg-gradient-to-r from-blue-500/15 to-violet-500/10 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
               >
@@ -527,137 +679,392 @@ export default function App() {
             )}
 
             {activeView === 'inbound' && (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-semibold text-white">Inbound application</h2>
-                  <p className="mt-1 text-sm text-slate-400">Queue a new company into the screening pipeline with structured inputs and attached documents.</p>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">Inbound Application Portal</h2>
+                  <p className="mt-2 text-sm text-slate-400">Submit your company for AI-driven investment committee review. Complete each section to enable comprehensive due diligence.</p>
                 </div>
 
-                <div className={`${panelClass} p-8`}>
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Company name</label>
-                      <input type="text" className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none transition focus:border-blue-400/50" defaultValue="InfraAI" />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Website URL</label>
-                      <input type="text" className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none transition focus:border-blue-400/50" defaultValue="infra.ai" />
+                {/* Company Information Section */}
+                <div className={panelClass}>
+                  <div className="border-b border-white/10 px-8 py-5">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">1. Company Information</h3>
+                  </div>
+                  <div className="space-y-6 p-8">
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      {[
+                        { label: 'Company Name', key: 'companyName', type: 'text' },
+                        { label: 'Website URL', key: 'website', type: 'text' },
+                        { label: 'One-Line Description', key: 'oneLineDescription', type: 'text' },
+                        { label: 'Industry / Sector', key: 'sector', type: 'text' },
+                        { label: 'Funding Stage', key: 'stage', type: 'select', options: ['Pre-Seed', 'Seed', 'Series A', 'Series B+'] },
+                        { label: 'Location', key: 'location', type: 'text' },
+                        { label: 'Funding Ask ($)', key: 'fundingAsk', type: 'number' },
+                        { label: 'Current Raise ($)', key: 'currentRaise', type: 'number' },
+                        { label: 'Company Email', key: 'companyEmail', type: 'email' },
+                        { label: 'Team Size', key: 'teamSize', type: 'number' },
+                        { label: 'Founded Year', key: 'foundedYear', type: 'number' },
+                        { label: 'Current Revenue ($)', key: 'currentRevenue', type: 'number' },
+                      ].map((field: any) => (
+                        <div key={field.key}>
+                          <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">{field.label}</label>
+                          {field.type === 'select' ? (
+                            <select value={(inboundForm as any)[field.key]} onChange={(e) => setInboundForm({...inboundForm, [field.key]: e.target.value})} className="w-full rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white outline-none transition focus:border-blue-400/50">
+                              {field.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          ) : (
+                            <input type={field.type} value={(inboundForm as any)[field.key]} onChange={(e) => setInboundForm({...inboundForm, [field.key]: e.target.type === 'number' ? Number(e.target.value) : e.target.value})} className="w-full rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white outline-none transition focus:border-blue-400/50" />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-12 text-center text-slate-400 transition hover:border-blue-400/30 hover:bg-blue-500/5">
-                    <UploadCloud className="mb-4 h-8 w-8 text-slate-300" />
-                    <div className="text-lg font-semibold text-slate-200">Upload pitch deck</div>
-                    <div className="mt-1 text-sm">PDF, PPTX, or link-based source</div>
-                    <input type="file" className="hidden" onChange={handleFileUpload} />
-                  </label>
-                  {uploadMessage ? <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{uploadMessage}</div> : null}
-                  <div className="mt-8 flex justify-end">
-                    <button onClick={startAnalysis} className={buttonClass} disabled={isRunningDiligence}>{isRunningDiligence ? 'Running diligence...' : 'Send to AI pipeline'}</button>
+                </div>
+
+                {/* Founder Information Section */}
+                <div className={panelClass}>
+                  <div className="border-b border-white/10 px-8 py-5">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">2. Founder Information</h3>
                   </div>
-                  {diligenceSummary ? <div className="mt-3 rounded-xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-200">{diligenceSummary}</div> : null}
+                  <div className="space-y-4 p-8">
+                    {founders.map((founder, idx) => (
+                      <div key={founder.id} className="rounded-xl border border-white/10 bg-slate-950/50 p-5">
+                        <div className="mb-4 flex items-center justify-between">
+                          <span className="text-sm font-semibold text-white">Founder {idx + 1}</span>
+                          <button onClick={() => setFounders(founders.filter(f => f.id !== founder.id))} className="text-xs text-slate-400 hover:text-rose-400">Remove</button>
+                        </div>
+                        <div className="grid gap-4 lg:grid-cols-2">
+                          {[
+                            { label: 'Name', key: 'name' },
+                            { label: 'LinkedIn', key: 'linkedin' },
+                            { label: 'GitHub', key: 'github' },
+                            { label: 'Twitter/X', key: 'twitter' },
+                            { label: 'Personal Website', key: 'website' },
+                          ].map((field) => (
+                            <input key={field.key} type="text" placeholder={field.label} value={founder[field.key]} onChange={(e) => setFounders(founders.map(f => f.id === founder.id ? {...f, [field.key]: e.target.value} : f))} className="rounded-lg border border-white/10 bg-slate-950/80 px-3 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                          ))}
+                        </div>
+                        <div className="mt-4 flex gap-3 flex-wrap text-[11px]">
+                          {[
+                            { label: 'Technical Founder', key: 'isTechnical' },
+                            { label: 'Previous Startup', key: 'previousStartup' },
+                            { label: 'Open Source Contributor', key: 'openSource' },
+                            { label: 'Research Publications', key: 'researchPubs' },
+                          ].map((field) => (
+                            <label key={field.key} className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={founder[field.key]} onChange={(e) => setFounders(founders.map(f => f.id === founder.id ? {...f, [field.key]: e.target.checked} : f))} className="h-3.5 w-3.5 rounded border-white/20" />
+                              <span className="text-slate-300">{field.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => setFounders([...founders, {id: Date.now(), name: '', linkedin: '', github: '', twitter: '', website: '', isTechnical: false, previousStartup: false, openSource: false, researchPubs: false}])} className={secondaryButtonClass}>+ Add founder</button>
+                  </div>
+                </div>
+
+                {/* Product Assets Section */}
+                <div className={panelClass}>
+                  <div className="border-b border-white/10 px-8 py-5">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">3. Product Assets</h3>
+                  </div>
+                  <div className="space-y-4 p-8">
+                    {assets.map((asset) => (
+                      <div key={asset.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/50 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-4 w-4 text-blue-400" />
+                          <div className="text-sm"><div className="font-medium text-white">{asset.type}</div><div className="text-xs text-slate-500">{asset.uploadedAt}</div></div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-300">✓ Ready</div>
+                            <div className="text-[10px] text-slate-500">Indexed</div>
+                          </div>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        </div>
+                      </div>
+                    ))}
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 p-6 text-center text-slate-400 transition hover:border-blue-400/30 hover:bg-blue-500/5">
+                      <UploadCloud className="mb-2 h-6 w-6 text-slate-300" />
+                      <div className="text-sm font-medium text-slate-200">Upload asset</div>
+                      <div className="text-[11px] text-slate-500">PDF, PPTX, Video, etc.</div>
+                      <input type="file" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                  </div>
+                </div>
+
+                {/* External Sources Section */}
+                <div className={panelClass}>
+                  <div className="border-b border-white/10 px-8 py-5">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">4. External Sources (AI-Crawled)</h3>
+                  </div>
+                  <div className="space-y-4 p-8">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      {Object.entries(externalSources).filter(([_, v]) => v).map(([key, value]: any) => (
+                        <div key={key} className="flex items-center gap-3 rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2">
+                          <Globe className="h-4 w-4 text-violet-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs text-slate-500 uppercase">{key}</div>
+                            <div className="truncate text-sm text-white">{value}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Investment Context Section */}
+                <div className={panelClass}>
+                  <div className="border-b border-white/10 px-8 py-5">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">5. Investment Context</h3>
+                  </div>
+                  <div className="space-y-5 p-8">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <input type="text" placeholder="Investment Thesis" value={investmentContext.thesis} onChange={(e) => setInvestmentContext({...investmentContext, thesis: e.target.value})} className="rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                      <select value={investmentContext.priority} onChange={(e) => setInvestmentContext({...investmentContext, priority: e.target.value})} className="rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white outline-none transition focus:border-blue-400/50">
+                        <option>Low</option>
+                        <option>Medium</option>
+                        <option>High</option>
+                      </select>
+                      <input type="text" placeholder="Partner Responsible" value={investmentContext.partner} onChange={(e) => setInvestmentContext({...investmentContext, partner: e.target.value})} className="rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                      <input type="text" placeholder="Fund" value={investmentContext.fund} onChange={(e) => setInvestmentContext({...investmentContext, fund: e.target.value})} className="rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                    </div>
+                    <textarea rows={3} placeholder="Internal Notes" value={investmentContext.notes} onChange={(e) => setInvestmentContext({...investmentContext, notes: e.target.value})} className="w-full resize-none rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                  </div>
+                </div>
+
+                {/* AI Enrichment Section */}
+                {enrichmentPhase !== 'idle' && (
+                  <div className={panelClass}>
+                    <div className="border-b border-white/10 px-8 py-5">
+                      <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">🤖 AI Enrichment Progress</h3>
+                    </div>
+                    <div className="space-y-3 p-8">
+                      {[
+                        { step: 'Reading Website', status: 'complete' },
+                        { step: 'Parsing Pitch Deck', status: 'complete' },
+                        { step: 'Discovering GitHub', status: enrichmentPhase === 'complete' ? 'complete' : 'running' },
+                        { step: 'Finding Founders', status: enrichmentPhase === 'complete' ? 'complete' : 'pending' },
+                        { step: 'Checking Research Papers', status: enrichmentPhase === 'complete' ? 'complete' : 'pending' },
+                        { step: 'Running Founder Analysis', status: enrichmentPhase === 'complete' ? 'complete' : 'pending' },
+                        { step: 'Building Knowledge Graph', status: enrichmentPhase === 'complete' ? 'complete' : 'pending' },
+                        { step: 'Launching Investment Committee', status: enrichmentPhase === 'complete' ? 'complete' : 'pending' },
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3">
+                          {item.status === 'complete' ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          ) : item.status === 'running' ? (
+                            <div className="h-4 w-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                          ) : (
+                            <div className="h-4 w-4 rounded-full border-2 border-slate-600" />
+                          )}
+                          <span className={`text-sm ${item.status === 'complete' ? 'text-emerald-300' : item.status === 'running' ? 'text-blue-300 animate-pulse' : 'text-slate-400'}`}>{item.step}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3">
+                  {enrichmentPhase === 'idle' && (
+                    <button onClick={handleInboundEnrichment} className={buttonClass} disabled={isRunningDiligence}>
+                      {isRunningDiligence ? 'Starting enrichment...' : '🚀 Start AI Enrichment'}
+                    </button>
+                  )}
+                  {enrichmentPhase === 'complete' && (
+                    <button onClick={startAnalysis} className={buttonClass}>✓ Submit to Investment Committee</button>
+                  )}
                 </div>
               </motion.div>
             )}
 
             {activeView === 'outbound' && (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-semibold text-white">Outbound sourcing discovery</h2>
-                  <p className="mt-1 text-sm text-slate-400">Build a high-signal funnel from public signals before founders formally raise capital.</p>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">Outbound Discovery</h2>
+                  <p className="mt-2 text-sm text-slate-400">Find high-potential startups before they formally raise. Proactive investing powered by AI signals.</p>
                 </div>
 
-                {outboundStep === 'identify' && (
-                  <div className="space-y-8">
-                    <div className="grid gap-4 md:grid-cols-4">
-                      {['GitHub Trending', 'arXiv Papers', 'Product Hunt', 'Accelerator cohorts'].map((source) => (
-                        <div key={source} className={`${panelSoftClass} flex items-center justify-between p-4`}>
-                          <span className="text-sm font-medium text-slate-300">{source}</span>
-                          <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                        </div>
-                      ))}
+                {outboundStep === 'discover' && (
+                  <div className="space-y-6">
+                    {/* Discovery Sources Configuration */}
+                    <div className={panelClass}>
+                      <div className="border-b border-white/10 px-8 py-5">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">Discovery Sources</h3>
+                      </div>
+                      <div className="grid gap-3 p-8 lg:grid-cols-3">
+                        {Object.entries(outboundSources).map(([key, enabled]: any) => (
+                          <label key={key} className="flex items-center gap-3 cursor-pointer rounded-lg border border-white/10 bg-slate-950/50 px-4 py-3 transition hover:bg-slate-950/70">
+                            <input type="checkbox" checked={enabled} onChange={(e) => setOutboundSources({...outboundSources, [key]: e.target.checked})} className="h-3.5 w-3.5 rounded border-white/20" />
+                            <span className="capitalize text-sm font-medium text-slate-300">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className={`${panelClass} p-6`}>
-                      <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Multi-attribute natural language query</h3>
-                      <div className="flex flex-col gap-3 md:flex-row">
-                        <input
-                          type="text"
-                          value={semanticQuery}
-                          onChange={(e) => setSemanticQuery(e.target.value)}
-                          className="flex-1 rounded-xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none transition focus:border-blue-400/50"
-                          placeholder="Search e.g. technical founder, Berlin, AI infra..."
-                        />
-                        <button onClick={handleSemanticSearch} className={buttonClass}>Execute query</button>
+                    {/* Natural Language Search */}
+                    <div className={panelClass}>
+                      <div className="border-b border-white/10 px-8 py-5">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">Natural Language Discovery</h3>
                       </div>
+                      <div className="space-y-4 p-8">
+                        <textarea rows={2} value={outboundQuery} onChange={(e) => setOutboundQuery(e.target.value)} placeholder="E.g. technical founder building AI infrastructure in Europe with strong GitHub community" className="w-full resize-none rounded-lg border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                        <div className="flex gap-3">
+                          <button onClick={handleOutboundSearch} className={buttonClass}>🔍 Execute Search</button>
+                          <button onClick={handleSaveQuery} className={secondaryButtonClass}>💾 Save Query</button>
+                        </div>
+                      </div>
+                    </div>
 
-                      {semanticResults.length > 0 && (
-                        <div className="mt-5 space-y-3">
-                          {semanticResults.map((r) => (
-                            <div key={r.name} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                              <div>
-                                <div className="font-semibold text-white">{r.name}</div>
-                                <div className="text-sm text-slate-400">{r.role} • {r.alignment}</div>
-                              </div>
-                              <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Score {r.score}</span>
+                    {/* Saved Queries */}
+                    {savedQueries.length > 0 && (
+                      <div className={panelClass}>
+                        <div className="border-b border-white/10 px-8 py-5">
+                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">Saved Discovery Queries</h3>
+                        </div>
+                        <div className="grid gap-3 p-8 lg:grid-cols-2">
+                          {savedQueries.map((q) => (
+                            <button key={q.id} onClick={() => setOutboundQuery(q.query)} className="rounded-lg border border-white/10 bg-slate-950/50 px-4 py-3 text-left transition hover:bg-slate-950/70">
+                              <div className="font-medium text-white text-sm">{q.name}</div>
+                              <div className="text-xs text-slate-500 line-clamp-1">{q.query}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Advanced Filters */}
+                    <div className={panelClass}>
+                      <div className="border-b border-white/10 px-8 py-5 flex items-center justify-between">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">Advanced Filters</h3>
+                        <Sliders className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <div className="space-y-6 p-8">
+                        <div className="grid gap-4 lg:grid-cols-2">
+                          <input type="text" placeholder="Sector (e.g. AI Infrastructure)" value={outboundFilters.sector} onChange={(e) => setOutboundFilters({...outboundFilters, sector: e.target.value})} className="rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                          <input type="text" placeholder="Country (e.g. Germany)" value={outboundFilters.country} onChange={(e) => setOutboundFilters({...outboundFilters, country: e.target.value})} className="rounded-lg border border-white/10 bg-slate-950/80 px-3.5 py-2 text-sm text-white placeholder-slate-600 outline-none transition focus:border-blue-400/50" />
+                        </div>
+                        <div className="grid gap-4 lg:grid-cols-3">
+                          {[
+                            { label: 'GitHub Stars', key: 'githubStars', min: 0, max: 100000 },
+                            { label: 'Employees', key: 'employees', min: 0, max: 1000 },
+                          ].map((field) => (
+                            <div key={field.key}>
+                              <label className="mb-2 block text-xs font-semibold text-slate-400">{field.label}</label>
+                              <input type="range" min={field.min} max={field.max} value={(outboundFilters as any)[field.key]?.max} onChange={(e) => setOutboundFilters({...outboundFilters, [(field.key as any)]: {...(outboundFilters as any)[field.key], max: Number(e.target.value)}})} className="w-full" />
                             </div>
                           ))}
                         </div>
-                      )}
+                        <div className="flex flex-wrap gap-3">
+                          {[
+                            { label: 'Research Published', key: 'researchPublished' },
+                            { label: 'Technical Founder', key: 'technicalFounder' },
+                            { label: 'OSS Contributor', key: 'ossContributor' },
+                          ].map((field) => (
+                            <label key={field.key} className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={(outboundFilters as any)[field.key]} onChange={(e) => setOutboundFilters({...outboundFilters, [(field.key as any)]: e.target.checked})} className="h-3.5 w-3.5 rounded border-white/20" />
+                              <span className="text-sm text-slate-300">{field.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Identified candidates</h3>
-                      {[
-                        { name: 'Sarah Chen', source: 'GitHub Commit (12k Stars)', location: 'San Francisco, CA', score: 92 },
-                        { name: 'Lukas Mueller', source: 'arXiv Paper (Compiler routing)', location: 'Berlin, Germany', score: 87 },
-                      ].map((founder) => (
-                        <div key={founder.name} className={`${panelClass} flex flex-col items-start justify-between gap-4 p-6 md:flex-row md:items-center`}>
-                          <div className="flex items-center space-x-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 text-2xl">👩‍💻</div>
-                            <div>
-                              <div className="font-semibold text-white">{founder.name}</div>
-                              <div className="text-sm text-slate-400">{founder.source} • {founder.location}</div>
+                    {/* Discovery Results */}
+                    <div className={panelClass}>
+                      <div className="border-b border-white/10 px-8 py-5">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">High-Potential Candidates</h3>
+                          <div className="text-xs text-slate-500">{discoveryResults.length} results</div>
+                        </div>
+                      </div>
+                      <div className="space-y-4 p-8">
+                        {discoveryResults.map((result) => (
+                          <div key={result.id} className="rounded-xl border border-white/10 bg-slate-950/50 p-6 transition hover:border-blue-400/30 hover:bg-slate-950/70">
+                            <div className="mb-4 flex items-start justify-between">
+                              <div>
+                                <h4 className="font-semibold text-white">{result.companyName}</h4>
+                                <div className="text-sm text-slate-400">Founded by {result.founderName}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-block h-2.5 w-2.5 rounded-full ${result.confidence > 0.8 ? 'bg-emerald-400' : 'bg-yellow-400'}`} />
+                                <span className="text-xs font-semibold text-slate-300">{(result.confidence * 100).toFixed(0)}%</span>
+                              </div>
+                            </div>
+                            <div className="mb-4 grid gap-3 lg:grid-cols-4">
+                              <div className="rounded-lg bg-slate-950/50 px-3 py-2">
+                                <div className="text-xs text-slate-500">Founder Score</div>
+                                <div className="font-semibold text-white">{result.founderScore}/100</div>
+                              </div>
+                              <div className="rounded-lg bg-slate-950/50 px-3 py-2">
+                                <div className="text-xs text-slate-500">Portfolio Fit</div>
+                                <div className="font-semibold text-white">{result.portfolioFit}/100</div>
+                              </div>
+                              <div className="rounded-lg bg-slate-950/50 px-3 py-2">
+                                <div className="text-xs text-slate-500">GitHub Stars</div>
+                                <div className="font-semibold text-white">{result.githubStars.toLocaleString()}</div>
+                              </div>
+                              <div className="rounded-lg bg-slate-950/50 px-3 py-2">
+                                <div className="text-xs text-slate-500">Expected Return</div>
+                                <div className="font-semibold text-emerald-300">{result.expectedReturn}</div>
+                              </div>
+                            </div>
+                            <div className="mb-4 rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2">
+                              <div className="text-xs text-blue-300">Why found: {result.foundReason}</div>
+                            </div>
+                            <button onClick={() => handleCreateInvestmentCase(result)} className={buttonClass}>Create Investment Case</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {outboundStep === 'evaluate' && selectedCandidate && (
+                  <div className={panelClass}>
+                    <div className="border-b border-white/10 px-8 py-5 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-white">{selectedCandidate.companyName} - Investment Case</h3>
+                      <button onClick={() => setOutboundStep('discover')} className="text-sm text-slate-400 hover:text-white transition">Close</button>
+                    </div>
+                    <div className="space-y-6 p-8">
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        {[
+                          { label: 'Founder Score', value: selectedCandidate.founderScore },
+                          { label: 'Company Score', value: selectedCandidate.companyScore },
+                          { label: 'Portfolio Fit', value: selectedCandidate.portfolioFit },
+                          { label: 'Market Score', value: selectedCandidate.marketScore },
+                          { label: 'Technology Score', value: selectedCandidate.techScore },
+                          { label: 'Cold Start Score', value: selectedCandidate.coldStartScore },
+                        ].map((metric) => (
+                          <div key={metric.label} className="rounded-lg border border-white/10 bg-slate-950/50 p-4">
+                            <div className="mb-2 text-xs font-semibold text-slate-500">{metric.label}</div>
+                            <div className="text-2xl font-bold text-white">{metric.value}</div>
+                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-900">
+                              <div className="h-full w-full bg-gradient-to-r from-blue-500 to-violet-500" style={{width: `${metric.value}%`}} />
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300">Founder score {founder.score}</span>
-                            <button onClick={() => handleOutboundIdentify(founder)} className={buttonClass}>Activate outreach</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {outboundStep === 'activate' && selectedOutboundFounder && (
-                  <div className={`${panelClass} p-8`}>
-                    <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                      <h3 className="text-lg font-semibold text-white">Draft automated outreach</h3>
-                      <button onClick={() => setOutboundStep('identify')} className="text-sm text-slate-400 transition hover:text-white">Cancel</button>
-                    </div>
-                    <div className="mt-5 space-y-4">
-                      <div className="flex items-center justify-between text-sm text-slate-400">
-                        <span>Recipient: {selectedOutboundFounder.name}</span>
-                        <span>Target score: {selectedOutboundFounder.score}</span>
+                        ))}
                       </div>
-                      <textarea rows={8} value={customOutreachMail} onChange={(e) => setCustomOutreachMail(e.target.value)} className="w-full resize-none rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400/50" />
-                    </div>
-                    <div className="mt-6 flex justify-end">
-                      <button onClick={handleOutboundActivate} className={buttonClass}>Send and converge funnel</button>
+                      <div className="rounded-lg border border-white/10 bg-slate-950/50 p-4">
+                        <div className="mb-2 text-sm font-semibold text-white">Investment Thesis</div>
+                        <p className="text-sm text-slate-400">{selectedCandidate.foundReason} — Strong alignment with fund strategy. GitHub community validates market demand. Founder background suggests execution capability.</p>
+                      </div>
+                      <button onClick={() => {setOutboundStep('case'); startAnalysis();}} className={buttonClass}>↪ Launch Full Investment Committee</button>
                     </div>
                   </div>
                 )}
 
-                {outboundStep === 'converge' && selectedOutboundFounder && (
-                  <div className={`${panelClass} p-12 text-center`}>
-                    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
-                      <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                    </div>
-                    <h3 className="text-2xl font-semibold text-white">Outreach activated</h3>
-                    <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-400">{selectedOutboundFounder.name}'s profile is now queued in the screening pipeline and ready for deeper review.</p>
+                {outboundStep === 'case' && (
+                  <div className={panelClass + ' p-12 text-center'}>
+                    <motion.div initial={{scale: 0}} animate={{scale: 1}} className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
+                      <Sparkles className="h-8 w-8 text-emerald-400" />
+                    </motion.div>
+                    <h3 className="text-2xl font-semibold text-white">Investment Case Generated</h3>
+                    <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-400">{selectedCandidate?.companyName} is now in the investment committee pipeline. Full memo and portfolio analysis launching...</p>
                     <div className="mt-6 flex justify-center gap-3">
-                      <button onClick={startAnalysis} className={buttonClass}>Start screening run</button>
-                      <button onClick={() => setOutboundStep('identify')} className={secondaryButtonClass}>Back to outbound</button>
+                      <button onClick={() => setActiveView('memo')} className={buttonClass}>View Investment Memo</button>
+                      <button onClick={() => {setOutboundStep('discover'); setSelectedCandidate(null);}} className={secondaryButtonClass}>Back to discovery</button>
                     </div>
                   </div>
                 )}
